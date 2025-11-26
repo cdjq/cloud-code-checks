@@ -82,7 +82,10 @@ jobs:
       || github.event_name == 'workflow_call'
 
     runs-on: ubuntu-24.04
-    continue-on-error: true
+    permissions:
+      checks: write
+      contents: read
+    # continue-on-error: true
     needs:
       - common                      ## 依赖 common job，确保环境变量已设置
     steps:
@@ -103,6 +106,10 @@ jobs:
           cache-key: ${{ needs.common.outputs.cache-key }}
 
       - name: Run pylint
+        if: always()
+        shell: bash {0}   # 去掉默认的 -e, 方便输出错误信息
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           . venv/bin/activate
 
@@ -113,9 +120,40 @@ jobs:
             echo "No Python files found. Skipping pylint."
             exit 0
           fi
+          set +e
+          pylint  -f parseable --rcfile=.action/.github/config/.pylintrc --persistent=n $FILES ## || true  ##运行 pylint 检查代码规范
+          PYLINT_EXIT=$?
+          echo "Pylint exit code: $PYLINT_EXIT"
 
-          pylint  -f parseable --rcfile=.action/.github/config/.pylintrc --persistent=n $FILES || true  ##运行 pylint 检查代码规范
-        if: always()
+          if [ $PYLINT_EXIT -eq 0 ]; then
+            echo "✅ Pylint passed"
+            exit 0
+          elif [ $PYLINT_EXIT -eq 20 ]; then
+            echo "⚠️ Pylint found errors or warnings"
+            curl --silent --show-error --location \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -X POST https://api.github.com/repos/$GITHUB_REPOSITORY/check-runs \
+            --data-binary @- >/dev/null 2>&1 <<EOF
+          {
+            "name": "Pylint Check",
+            "head_sha": "$GITHUB_SHA",
+            "status": "completed",
+            "conclusion": "neutral",
+            "completed_at": "$(date -u +'%Y-%m-%dT%H:%M:%SZ')",
+            "output": {
+              "title": "Pylint check warnings",
+              "summary": "⚠️ 存在警告，请点击左侧导航栏 [pylint] ---->>> [Run pylint] 查看警告日志。",
+              "text": "### 说明\n本次构建存在 Pylint 警告，详细输出已在 Actions 日志中展示。"
+            }
+          }
+          EOF
+
+            else
+              echo "❌ Pylint failed"
+              exit $PYLINT_EXIT
+            fi
+
       - name: Suggested changes
         run: |
           if git diff --quiet; then
@@ -136,6 +174,11 @@ jobs:
 
     name: check clang-tidy and build
     runs-on: ubuntu-24.04
+    permissions:
+      checks: write
+      contents: read
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     needs:
       - common
     steps:
@@ -166,6 +209,7 @@ jobs:
           pio run -t compiledb
 
       - name: Run clang-tidy
+        if: always()
         run: |
           FILES=$(find . \
           -path './.git'    -prune -o \
@@ -177,12 +221,42 @@ jobs:
               echo "No source files found."
               exit 0
           fi
-          clang-tidy $FILES -p . \
+          OUTPUT=$(clang-tidy $FILES -p . \
           -header-filter="$filter" \
-          -config-file=.action/.github/config/.clang-tidy \
-          || false
-        if: always()
+          -config-file=./.github/config/.clang-tidy \
+          2>&1 || true)
 
+          echo "$OUTPUT"
+
+          if echo "❌ $OUTPUT" | grep -q "error:"; then
+            echo "::error::clang-tidy found errors."
+            exit 1
+          elif echo "$OUTPUT" | grep -q "warning:"; then
+            echo "⚠️ clang-tidy found warnings."
+
+            curl --silent --show-error --location \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -X POST https://api.github.com/repos/$GITHUB_REPOSITORY/check-runs \
+            --data-binary @- >/dev/null 2>&1 <<EOF
+          {
+            "name": "Clang-Tidy Check",
+            "head_sha": "$GITHUB_SHA",
+            "status": "completed",
+            "conclusion": "neutral",
+            "completed_at": "$(date -u +'%Y-%m-%dT%H:%M:%SZ')",
+            "details_url": "https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID",
+            "output": {
+              "title": "Clang-Tidy check warnings",
+              "summary": "⚠️ 存在警告，请点击左侧导航栏 [check clang-tidy and build] ---->>> [Run clang-tidy] 查看警告日志。",
+              "text": "本次构建存在 clang-tidy 警告，详细输出已在 Actions 日志中展示。"
+            }
+          }
+          EOF
+          else
+            echo "✅ clang-tidy passed"
+            exit 0
+          fi
 
   release:
       name: Check tag version
