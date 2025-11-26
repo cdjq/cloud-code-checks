@@ -223,7 +223,7 @@ jobs:
           fi
           OUTPUT=$(clang-tidy $FILES -p . \
           -header-filter="$filter" \
-          -config-file=./.github/config/.clang-tidy \
+          -config-file=.action/.github/config/.clang-tidy \
           2>&1 || true)
 
           echo "$OUTPUT"
