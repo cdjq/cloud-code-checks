@@ -47,7 +47,7 @@ function-rgx=[a-z_][a-z0-9_]{2,30}$
 variable-rgx=[a-z_][a-z0-9_]{2,30}$
 attr-rgx=_?[a-z_][a-z0-9_]{2,30}$        # 成员属性（允许前导下划线）
 
-const-rgx=(_?[A-Z][A-Z0-9_]{2,50}|__.*__)$
+const-rgx=[a-z_][a-z0-9_]{2,30}$
 
 [LOGGING]
 logging-modules=logging
