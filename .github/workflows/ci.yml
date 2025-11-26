@@ -279,7 +279,7 @@ jobs:
             "output": {
               "title": "Clang-Tidy check warnings",
               "summary": "⚠️ 存在警告，请点击左侧导航栏 [check clang-tidy and build] ---->>> [Run clang-tidy] 查看警告日志。",
-              "text": "本次构建存在 clang-tidy 警告，详细输出已在 Actions 日志中展示。"
+              "text": "### 说明\n本次构建存在 clang-tidy 警告，详细输出已在 Actions 日志中展示。"
             }
           }
           EOF
