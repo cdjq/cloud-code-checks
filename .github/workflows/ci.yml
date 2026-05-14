@@ -240,9 +240,16 @@ jobs:
           echo "Files in compile_commands.json:"
           jq -r '.[].file' compile_commands.json
 
-          jq -r '.[].file' compile_commands.json \
-            | grep -E '\.(c|cc|cpp|cxx)$' \
-            > clang-tidy-files.txt || true
+          jq -r --arg workspace "$PWD" '
+            .[].file
+            | select(test("\\.(c|cc|cpp|cxx)$"))
+            | select(
+                startswith("src/")
+                or startswith("./src/")
+                or startswith($workspace + "/src/")
+                or test("/libraries/Wire/src/utility/twi\\.c$")
+              )
+          ' compile_commands.json > clang-tidy-files.txt || true
 
           echo "Files for clang-tidy:"
           cat clang-tidy-files.txt || true
