@@ -24,7 +24,7 @@ runs:
 
     - name: Restore Python3 virtual environment
       id: cache-venv
-      uses: actions/cache/restore@v4.2.4
+      uses: actions/cache/restore@v5
       with:
         path: venv
         key: ${{ runner.os }}-${{ inputs.python-version }}-venv-${{ inputs.cache-key }}
