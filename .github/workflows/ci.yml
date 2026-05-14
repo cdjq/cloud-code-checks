@@ -237,29 +237,42 @@ jobs:
         run: | 
           pio run -t compiledb
 
+          echo "Files in compile_commands.json:"
+          jq -r '.[].file' compile_commands.json
+
+          jq -r '.[].file' compile_commands.json \
+            | grep -E '\.(c|cc|cpp|cxx)$' \
+            > clang-tidy-files.txt || true
+
+          echo "Files for clang-tidy:"
+          cat clang-tidy-files.txt || true
+
       - name: Run clang-tidy
         if: always()
         run: |
-          FILES=$(find . \
-          -path './.git'    -prune -o \
-          -path './.github' -prune -o \
-          -path './.pio'   -prune -o \
-          -type f \( -name '*.cpp' -o -name '*.ino' \) -print) ## -type f \( -name '*.cpp' -o -name '*.h' -o -name '*.ino' \) -print)
-          
-          
-          echo "Running clang-tidy on $FILES"
-          if [ -z "$FILES" ]; then             # 检查是否有文件
-              echo "No source files found."
+          if [ ! -f clang-tidy-files.txt ]; then
+              echo "clang-tidy-files.txt not found. Skipping clang-tidy."
               exit 0
           fi
-          OUTPUT=$(clang-tidy $FILES -p . \
-          -header-filter="$filter" \
-          -config-file=.action/.github/config/.clang-tidy \
-          2>&1 || true)
+
+          mapfile -t FILES < clang-tidy-files.txt
+
+          if [ ${#FILES[@]} -eq 0 ]; then
+              echo "No source files found for clang-tidy."
+              exit 0
+          fi
+
+          echo "Running clang-tidy on:"
+          printf '  %s\n' "${FILES[@]}"
+
+          OUTPUT=$(clang-tidy "${FILES[@]}" -p . \
+            -header-filter='.*/src/.*' \
+            -config-file=.action/.github/config/.clang-tidy \
+            2>&1 || true)
 
           echo "$OUTPUT"
 
-          if echo "❌ $OUTPUT" | grep -q "error:"; then
+          if echo "$OUTPUT" | grep -q "error:"; then
             echo "::error::clang-tidy found errors."
             exit 1
           elif echo "$OUTPUT" | grep -q "warning:"; then
@@ -284,9 +297,26 @@ jobs:
             }
           }
           EOF
+            exit 0
           else
             echo "✅ clang-tidy passed"
             exit 0
+          fi
+
+      - name: Build examples
+        if: always()
+        run: |
+          found=0
+
+          for sketch in examples/*/*.ino; do
+            [ -e "$sketch" ] || continue
+            found=1
+            echo "Building $sketch"
+            pio ci "$sketch" --lib . --project-conf platformio.ini
+          done
+
+          if [ "$found" -eq 0 ]; then
+            echo "No examples found."
           fi
 
   release:
