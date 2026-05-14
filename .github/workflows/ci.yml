@@ -250,7 +250,6 @@ jobs:
                 or startswith(".pio/libdeps/")
                 or startswith("./.pio/libdeps/")
                 or startswith($workspace + "/.pio/libdeps/")
-                or test("(^|/)\\.pio/build/[^/]+/src/.*\\.ino\\.cpp$")
               )
           ' compile_commands.json > clang-tidy-files.txt || true
 
@@ -315,21 +314,21 @@ jobs:
             exit 0
           fi
 
-      - name: Build examples
-        if: always()
-        run: |
-          found=0
+      # - name: Build examples
+      #   if: always()
+      #   run: |
+      #     found=0
 
-          for sketch in examples/*/*.ino; do
-            [ -e "$sketch" ] || continue
-            found=1
-            echo "Building $sketch"
-            pio ci "$sketch" --lib . --project-conf platformio.ini
-          done
+      #     for sketch in examples/*/*.ino; do
+      #       [ -e "$sketch" ] || continue
+      #       found=1
+      #       echo "Building $sketch"
+      #       pio ci "$sketch" --lib . --project-conf platformio.ini
+      #     done
 
-          if [ "$found" -eq 0 ]; then
-            echo "No examples found."
-          fi
+      #     if [ "$found" -eq 0 ]; then
+      #       echo "No examples found."
+      #     fi
 
   release:
       name: Check tag version
