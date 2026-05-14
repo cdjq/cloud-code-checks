@@ -250,6 +250,7 @@ jobs:
                 or startswith(".pio/libdeps/")
                 or startswith("./.pio/libdeps/")
                 or startswith($workspace + "/.pio/libdeps/")
+                or test("(^|/)\\.pio/build/[^/]+/src/.*\\.ino\\.cpp$")
               )
           ' compile_commands.json > clang-tidy-files.txt || true
 
