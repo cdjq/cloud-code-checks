@@ -244,7 +244,8 @@ jobs:
           -path './.git'    -prune -o \
           -path './.github' -prune -o \
           -path './.pio'   -prune -o \
-          -type f \( -name '*.cpp' -o -name '*.h' -o -name '*.ino' \) -print)
+          ## -type f \( -name '*.cpp' -o -name '*.h' -o -name '*.ino' \) -print)
+          -type f \( -name '*.cpp' -o -name '*.ino' \) -print)
           
           echo "Running clang-tidy on $FILES"
           if [ -z "$FILES" ]; then             # 检查是否有文件
