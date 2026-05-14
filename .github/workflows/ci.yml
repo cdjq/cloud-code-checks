@@ -247,7 +247,9 @@ jobs:
                 startswith("src/")
                 or startswith("./src/")
                 or startswith($workspace + "/src/")
-                or test("/libraries/Wire/src/utility/twi\\.c$")
+                or startswith(".pio/libdeps/")
+                or startswith("./.pio/libdeps/")
+                or startswith($workspace + "/.pio/libdeps/")
               )
           ' compile_commands.json > clang-tidy-files.txt || true
 
@@ -272,8 +274,10 @@ jobs:
           echo "Running clang-tidy on:"
           printf '  %s\n' "${FILES[@]}"
 
+          HEADER_FILTER="^(src/|include/|examples/|\\.pio/libdeps/|\\./src/|\\./include/|\\./examples/|\\./\\.pio/libdeps/|$PWD/(src|include|examples)/|$PWD/\\.pio/libdeps/)"
+
           OUTPUT=$(clang-tidy "${FILES[@]}" -p . \
-            -header-filter='.*/src/.*' \
+            -header-filter="$HEADER_FILTER" \
             -config-file=.action/.github/config/.clang-tidy \
             2>&1 || true)
 
