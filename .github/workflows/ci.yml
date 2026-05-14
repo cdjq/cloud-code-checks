@@ -221,7 +221,16 @@ jobs:
 
                   # 将每个依赖（逗号分隔）添加到 lib_deps，每行一个
                   echo "$DEPENDS" | tr ',' '\n' | while read dep; do
-                      dep=$(echo $dep | xargs)  # 去掉首尾空格
+                      dep=$(echo "$dep" | xargs)  # 去掉首尾空格
+                      dep_name=$(echo "$dep" | sed 's/[[:space:]]*(.*$//' | xargs)
+                      dep_key=$(echo "$dep_name" | tr '[:upper:]' '[:lower:]')
+
+                      case "$dep_key" in
+                        arduino|wire|spi|eeprom|servo|softwareserial|hardwareserial)
+                          echo "Skipping built-in Arduino library dependency: $dep_name"
+                          continue
+                          ;;
+                      esac
                       if [ -n "$dep" ]; then
                           echo "    $dep" >> platformio.ini
                       fi
@@ -245,14 +254,40 @@ jobs:
           -path './.github' -prune -o \
           -path './.pio'   -prune -o \
           -type f \( -name '*.cpp' -o -name '*.h' -o -name '*.ino' \) -print)
+
+          INCLUDE_ARGS=()
+          while IFS= read -r include_dir; do
+              [ -n "$include_dir" ] || continue
+              INCLUDE_ARGS+=("-extra-arg=-I$include_dir")
+          done < <(
+              {
+                  find "$HOME/.platformio/packages" -type d \
+                    \( -path '*/framework-arduino*/cores/*' \
+                    -o -path '*/framework-arduino*/variants/*' \
+                    -o -path '*/framework-arduino*/libraries/*/src' \) \
+                    -print 2>/dev/null || true
+                  find ./.pio/libdeps -type d -path './.pio/libdeps/*/*/src' -print 2>/dev/null || true
+                  [ -d ./src ] && printf '%s\n' ./src
+                  [ -d ./include ] && printf '%s\n' ./include
+              } | sort -u
+          )
+          INCLUDE_ARGS+=("-extra-arg=-DARDUINO=10819")
+          INCLUDE_ARGS+=("-extra-arg=-DARDUINO_AVR_MEGA2560")
+          INCLUDE_ARGS+=("-extra-arg=-DARDUINO_ARCH_AVR")
+          INCLUDE_ARGS+=("-extra-arg=-DF_CPU=16000000L")
+          INCLUDE_ARGS+=("-extra-arg=-x")
+          INCLUDE_ARGS+=("-extra-arg=c++")
           
           echo "Running clang-tidy on $FILES"
+          echo "clang-tidy extra args:"
+          printf '  %s\n' "${INCLUDE_ARGS[@]}"
           if [ -z "$FILES" ]; then             # 检查是否有文件
               echo "No source files found."
               exit 0
           fi
           OUTPUT=$(clang-tidy $FILES -p . \
-          -header-filter="$filter" \
+          "${INCLUDE_ARGS[@]}" \
+          -header-filter=".*" \
           -config-file=.action/.github/config/.clang-tidy \
           2>&1 || true)
 
