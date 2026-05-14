@@ -219,7 +219,7 @@ jobs:
                       echo "lib_deps =" >> ./platformio.ini
                   fi
 
-                  # 将每个依赖（逗号分隔）添加到 lib_deps，每行一个
+                  # 将每个依赖（逗号分隔）添加到 lib_deps, 每行一个
                   echo "$DEPENDS" | tr ',' '\n' | while read dep; do
                       dep=$(echo $dep | xargs)  # 去掉首尾空格
                       if [ -n "$dep" ]; then
@@ -314,21 +314,21 @@ jobs:
             exit 0
           fi
 
-      # - name: Build examples
-      #   if: always()
-      #   run: |
-      #     found=0
+      - name: Build examples
+        if: always()
+        run: |
+          found=0
 
-      #     for sketch in examples/*/*.ino; do
-      #       [ -e "$sketch" ] || continue
-      #       found=1
-      #       echo "Building $sketch"
-      #       pio ci "$sketch" --lib . --project-conf platformio.ini
-      #     done
+          for sketch in examples/*/*.ino; do
+            [ -e "$sketch" ] || continue
+            found=1
+            echo "Building $sketch"
+            pio ci "$sketch" --lib . --project-conf platformio.ini
+          done
 
-      #     if [ "$found" -eq 0 ]; then
-      #       echo "No examples found."
-      #     fi
+          if [ "$found" -eq 0 ]; then
+            echo "No examples found."
+          fi
 
   release:
       name: Check tag version
