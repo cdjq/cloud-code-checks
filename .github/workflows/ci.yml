@@ -247,41 +247,114 @@ jobs:
                 startswith("src/")
                 or startswith("./src/")
                 or startswith($workspace + "/src/")
-                or startswith(".pio/libdeps/")
-                or startswith("./.pio/libdeps/")
-                or startswith($workspace + "/.pio/libdeps/")
+                or test("(^|/)\\.pio/build/[^/]+/src/.*\\.ino\\.cpp$")
               )
           ' compile_commands.json > clang-tidy-files.txt || true
 
           echo "Files for clang-tidy:"
           cat clang-tidy-files.txt || true
 
+      - name: Build examples and generate compile databases
+        if: always()
+        run: |
+          : > clang-tidy-example-dbs.txt
+
+          if [ ! -d examples ]; then
+            echo "No examples found."
+            exit 0
+          fi
+
+          found=0
+          ci_root="${RUNNER_TEMP:-/tmp}/pio-ci-clang-tidy"
+          mkdir -p "$ci_root"
+
+          while IFS= read -r -d '' sketch; do
+            found=1
+            sketch_id=$(echo "$sketch" | sed 's#[^A-Za-z0-9_.-]#_#g')
+            build_dir="$ci_root/$sketch_id"
+
+            echo "Building $sketch"
+            pio ci --lib . --project-conf platformio.ini --build-dir "$build_dir" --keep-build-dir "$sketch"
+
+            (
+              cd "$build_dir"
+              pio run -t compiledb
+            )
+
+            if [ -f "$build_dir/compile_commands.json" ]; then
+              echo "$build_dir" >> clang-tidy-example-dbs.txt
+              echo "Files in $build_dir/compile_commands.json:"
+              jq -r '.[].file' "$build_dir/compile_commands.json"
+              echo "Generated sketch files for clang-tidy:"
+              jq -r '.[].file | select(test("\\.ino\\.cpp$"))' "$build_dir/compile_commands.json" || true
+            else
+              echo "::warning::No compile_commands.json generated for $sketch"
+            fi
+          done < <(find examples -mindepth 2 -type f -name '*.ino' -print0)
+
+          if [ "$found" -eq 0 ]; then
+            echo "No examples found."
+          fi
+
       - name: Run clang-tidy
         if: always()
         run: |
-          if [ ! -f clang-tidy-files.txt ]; then
-              echo "clang-tidy-files.txt not found. Skipping clang-tidy."
-              exit 0
+          OUTPUT=""
+
+          if [ -f clang-tidy-files.txt ]; then
+              mapfile -t FILES < clang-tidy-files.txt
+          else
+              FILES=()
           fi
 
-          mapfile -t FILES < clang-tidy-files.txt
+          if [ ${#FILES[@]} -gt 0 ]; then
+              echo "Running clang-tidy on:"
+              printf '  %s\n' "${FILES[@]}"
 
-          if [ ${#FILES[@]} -eq 0 ]; then
-              echo "No source files found for clang-tidy."
-              exit 0
+              HEADER_FILTER="^(src/|include/|examples/|\\./src/|\\./include/|\\./examples/|$PWD/(src|include|examples)/)"
+
+              ROOT_OUTPUT=$(clang-tidy "${FILES[@]}" -p . \
+                -header-filter="$HEADER_FILTER" \
+                -config-file=.action/.github/config/.clang-tidy \
+                2>&1 || true)
+
+              echo "$ROOT_OUTPUT"
+              OUTPUT+="$ROOT_OUTPUT"$'\n'
+          else
+              echo "No project or dependency source files found for clang-tidy."
           fi
 
-          echo "Running clang-tidy on:"
-          printf '  %s\n' "${FILES[@]}"
+          if [ -f clang-tidy-example-dbs.txt ]; then
+            while IFS= read -r db_dir; do
+              [ -n "$db_dir" ] || continue
+              [ -f "$db_dir/compile_commands.json" ] || continue
 
-          HEADER_FILTER="^(src/|include/|examples/|\\.pio/libdeps/|\\./src/|\\./include/|\\./examples/|\\./\\.pio/libdeps/|$PWD/(src|include|examples)/|$PWD/\\.pio/libdeps/)"
+              mapfile -t EXAMPLE_FILES < <(jq -r '.[].file | select(test("\\.ino\\.cpp$"))' "$db_dir/compile_commands.json")
 
-          OUTPUT=$(clang-tidy "${FILES[@]}" -p . \
-            -header-filter="$HEADER_FILTER" \
-            -config-file=.action/.github/config/.clang-tidy \
-            2>&1 || true)
+              if [ ${#EXAMPLE_FILES[@]} -eq 0 ]; then
+                echo "No generated .ino.cpp files found in $db_dir/compile_commands.json."
+                continue
+              fi
 
-          echo "$OUTPUT"
+              echo "Running clang-tidy on generated example sketch files from $db_dir:"
+              printf '  %s\n' "${EXAMPLE_FILES[@]}"
+
+              EXAMPLE_HEADER_FILTER="^($PWD/(src|include|examples)/|$db_dir/(src|include|lib)/)"
+
+              EXAMPLE_OUTPUT=$(clang-tidy "${EXAMPLE_FILES[@]}" -p "$db_dir" \
+                -header-filter="$EXAMPLE_HEADER_FILTER" \
+                -config-file=.action/.github/config/.clang-tidy \
+                2>&1 || true)
+
+              echo "$EXAMPLE_OUTPUT"
+              OUTPUT+="$EXAMPLE_OUTPUT"$'\n'
+            done < clang-tidy-example-dbs.txt
+          fi
+
+          if [ -z "$OUTPUT" ]; then
+            echo "No source files found for clang-tidy."
+            exit 0
+          fi
 
           if echo "$OUTPUT" | grep -q "error:"; then
             echo "::error::clang-tidy found errors."
@@ -312,22 +385,6 @@ jobs:
           else
             echo "✅ clang-tidy passed"
             exit 0
-          fi
-
-      - name: Build examples
-        if: always()
-        run: |
-          found=0
-
-          for sketch in examples/*/*.ino; do
-            [ -e "$sketch" ] || continue
-            found=1
-            echo "Building $sketch"
-            pio ci "$sketch" --lib . --project-conf platformio.ini
-          done
-
-          if [ "$found" -eq 0 ]; then
-            echo "No examples found."
           fi
 
   release:
