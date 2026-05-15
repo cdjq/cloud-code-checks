@@ -246,8 +246,9 @@ jobs:
         run: | 
           pio run -t compiledb
 
-          echo "compile_commands.json:"
-          jq . compile_commands.json
+          # 输出
+          # echo "compile_commands.json:"
+          # jq . compile_commands.json
 
       - name: Run clang-tidy
         if: always()
@@ -269,6 +270,10 @@ jobs:
                     -o -path '*/framework-arduino*/variants/*' \
                     -o -path '*/framework-arduino*/libraries/*/src' \) \
                     -print 2>/dev/null || true
+                  find "$HOME/.platformio/packages" -path '*/toolchain-*' -type d -prune \
+                    -exec find {} -type d \
+                    \( -name include -o -name include-fixed \) \
+                    -print \; 2>/dev/null || true
                   find ./.pio/libdeps -type d -path './.pio/libdeps/*/*/src' -print 2>/dev/null || true
                   [ -d ./src ] && printf '%s\n' ./src
                   [ -d ./include ] && printf '%s\n' ./include
@@ -277,6 +282,8 @@ jobs:
           INCLUDE_ARGS+=("-extra-arg=-DARDUINO=10819")
           INCLUDE_ARGS+=("-extra-arg=-DARDUINO_AVR_MEGA2560")
           INCLUDE_ARGS+=("-extra-arg=-DARDUINO_ARCH_AVR")
+          INCLUDE_ARGS+=("-extra-arg=-D__AVR__")
+          INCLUDE_ARGS+=("-extra-arg=-D__AVR_ATmega2560__")
           INCLUDE_ARGS+=("-extra-arg=-DF_CPU=16000000L")
           INCLUDE_ARGS+=("-extra-arg=-x")
           INCLUDE_ARGS+=("-extra-arg=c++")
