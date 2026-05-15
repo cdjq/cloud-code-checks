@@ -2,6 +2,7 @@
 # GitHub 云端检查 CI
 
 用于 GitHub Actions 云端代码检查和 CI/CD 的工作流配置仓库。
+项目说明文档：https://h7dvigefi0.feishu.cn/wiki/LiXdwAEW1iKTwCkPfVncnmysnYc
 
 ## 介绍
 
@@ -123,7 +124,4 @@ pylint:
 - 如果项目不需要 C++ 检查，可以移除 `clang-tidy` job 和相关依赖
 - 版本检查需要项目根目录有 `library.properties` 文件
 - 首次运行可能需要较长时间来下载和安装依赖
-
-
-
-
+- 如有第三方库依赖，请在library.properties中的depends字段中添加,多个依赖请用逗号隔离
