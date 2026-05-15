@@ -246,7 +246,7 @@ jobs:
         run: | 
           pio run -t compiledb
 
-          # 输出
+          # 输出打印 compile_commands.json
           # echo "compile_commands.json:"
           # jq . compile_commands.json
 
@@ -289,9 +289,11 @@ jobs:
           INCLUDE_ARGS+=("-extra-arg=c++")
           
           echo "Running clang-tidy on $FILES"
-          echo "clang-tidy extra args:"
-          printf '  %s\n' "${INCLUDE_ARGS[@]}"
-          if [ -z "$FILES" ]; then             # 检查是否有文件
+          
+          # echo "clang-tidy extra args:"        # 输出打印 
+          # printf '  %s\n' "${INCLUDE_ARGS[@]}" # 输出打印 clang-tidy include_dir参数
+
+          if [ -z "$FILES" ]; then               # 检查是否有文件
               echo "No source files found."
               exit 0
           fi
