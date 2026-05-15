@@ -297,7 +297,7 @@ jobs:
               echo "No source files found."
               exit 0
           fi
-          HEADER_FILTER="^(\\./)?(src|include|examples)/|^$PWD/(src|include|examples)/"
+          HEADER_FILTER="^(\\./)?(src|include|examples)/|^$PWD/(src|examples)/"
           OUTPUT=$(clang-tidy $FILES -p . \
           "${INCLUDE_ARGS[@]}" \
           -header-filter="$HEADER_FILTER" \
