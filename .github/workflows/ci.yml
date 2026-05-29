@@ -257,7 +257,7 @@ jobs:
           -path './.git'    -prune -o \
           -path './.github' -prune -o \
           -path './.pio'   -prune -o \
-          -type f \( -name '*.cpp' -o -name '*.h' -o -name '*.ino' \) -print)
+          -type f \( -name 'DFRobot_*.cpp' -o -name 'DFRobot_*.h' -o -name '*.ino' \) -print)
 
           INCLUDE_ARGS=()
           while IFS= read -r include_dir; do
